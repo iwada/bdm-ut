@@ -3,6 +3,7 @@ import json
 from os import remove
 import re
 import yaml
+import requests
 
 #Loads file to memory
 """ with open("test3.json", "r") as fout2:
@@ -74,7 +75,31 @@ def fix_publication_type(file):
         json.dump(json_content,file_out)
 
 
-
+def refining_venues(file):
+    json_content = []
+    with open(file, "r") as file_handle, open("refined_venues.json", "w") as file_out:
+        json_data = json.load(file_handle)
+        for item in json_data:
+            if "venue" in item and "raw" in item["venue"]: #TODO refactor this PLEASE
+                venue = item["venue"] 
+                venue_raw = venue["raw"]
+                # print(item["venue"]["raw"])
+                # print("================== \n")
+                if venue_raw != None and (len(venue_raw) < 6 or len(venue_raw.split()) < 2):
+                    response = requests.get(f"https://dblp.org/search/venue/api?q={venue_raw}&format=json")
+                    if response.status_code == 200:
+                        result = response.json()
+                        if result["result"]["hits"] and "hit" in result["result"]["hits"] and result["result"]["hits"]["hit"][0]["info"]["venue"]:
+                            item["venue"]["name"] = result["result"]["hits"]["hit"][0]["info"]["venue"]
+                        else: 
+                            item["venue"]["name"] = venue_raw
+                    else:
+                        item["venue"]["name"] = venue_raw
+                else: 
+                    item["venue"]["name"] = venue_raw
+            
+            json_content.append(item)
+        json.dump(json_content,file_out)
 
 
 
@@ -82,7 +107,9 @@ def fix_publication_type(file):
 #input_file = "input/staging_data.json"
 #output_file = "output/staging_data.json"
 
-input_file = "fix_issn_with_doi.json"
+input_file = "drop_publications_with_short_titles.json"
+
+refining_venues(input_file)
 
 #fix_json(input_file,output_file) # always replace [] after runing
 #drop_publications_with_short_titles(output_file)
